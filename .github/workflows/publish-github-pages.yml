@@ -1,0 +1,46 @@
+name: "[M] Publish Site"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_and_publish_doc_site:
+    if: github.ref != 'refs/heads/gh-pages' && github.ref != 'gh-pages'
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        scala:
+          - { version: "2.13.8", binary-version: "2.13", java-version: "11" }
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.scala.java-version }}
+
+      - name: Cache Coursier
+        uses: actions/cache@v1
+        with:
+          path: ~/.cache/coursier
+          key: ${{ runner.os }}-coursier-scala-${{ matrix.scala.binary-version }}-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('**/build.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-coursier-scala-${{ matrix.scala.binary-version }}-
+
+      - name: Cache Ivy
+        uses: actions/cache@v1
+        with:
+          path: ~/.ivy2/cache
+          key: ${{ runner.os }}-ivy-scala-${{ matrix.scala.binary-version }}-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('**/build.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-ivy-scala-${{ matrix.scala.binary-version }}-
+
+      - name: Build and publish website
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sbt -J-Xmx2048m \
+            ++${{ matrix.scala.version }}! \
+            -v \
+            publishToGitHubPages
